@@ -64,174 +64,19 @@ def create_surface_with_text(text, font_size, text_rgb, bg_rgb):
 #End Texture Loading#
 ###############################Init and Setup END########################################
 
-################################Class Def BEGIN##########################################
-class UIElement():
-    """ An user interface element that can be added to a surface """
-
-    def __init__(self, center_position, text, font_size, bg_rgb, text_rgb):
-        self.mouse_over = False  # indicates if the mouse is over the element
-
-        # create the default image
-        default_image = create_surface_with_text(
-            text=text, font_size=font_size, text_rgb=text_rgb, bg_rgb=bg_rgb
-        )
-
-        # create the image that shows when mouse is over the element
-        highlighted_image = create_surface_with_text(
-            text=text, font_size=font_size * 1.2, text_rgb=text_rgb, bg_rgb=bg_rgb
-        )
-
-        # add both images and their rects to lists
-        self.images = [default_image, highlighted_image]
-        self.rects = [
-            default_image.get_rect(center=center_position),
-            highlighted_image.get_rect(center=center_position),
-        ]
-
-    # properties that vary the image and its rect when the mouse is over the element
-    @property
-    def image(self):
-        return self.images[1] if self.mouse_over else self.images[0]
-
-    @property
-    def rect(self):
-        return self.rects[1] if self.mouse_over else self.rects[0]
-
-    def update(self, mouse_pos, mouse_up):
-        if self.rect.collidepoint(mouse_pos):
-            self.mouse_over = True
-            if mouse_up:
-                return 1
-        else:
-            self.mouse_over = False
-
-    def draw(self, surface):
-        surface.blit(self.image, self.rect)
-
-        # calls the init method of the parent sprite class
-        super().__init__()
-
-###############################SpriteSheet Class Begin###################################
-class SpriteSheet:
-    def __init__(self, filename):
-        try:
-            self.sheet = pygame.image.load(filename).convert_alpha()
-        except pygame.error as e:
-            print(f"Unable to load spritesheet image: {filename}")
-
-    def image_at(self, rectangle, colorkey = None):
-        """Load a specific image from a specific rectangle."""
-        # Loads image from x, y, x+offset, y+offset.
-        rect = pygame.Rect(rectangle)
-        image = pygame.Surface(rect.size).convert()
-        image.blit(self.sheet, (0, 0), rect)
-        if colorkey is not None:
-            if colorkey is -1:
-                colorkey = image.get_at((0,0))
-            image.set_colorkey(colorkey, pygame.RLEACCEL)
-        return image
-
-    def images_at(self, rects, colorkey = None):
-        """Load a whole bunch of images and return them as a list."""
-        return [self.image_at(rect, colorkey) for rect in rects]
-
-    def load_strip(self, rect, image_count, colorkey = None):
-        """Load a whole strip of images, and return them as a list."""
-        tups = [(rect[0]+rect[2]*x, rect[1], rect[2], rect[3])
-                for x in range(image_count)]
-        return self.images_at(tups, colorkey)
-###############################SpriteSheet Class End#####################################
-###############################Player Class BEGIN########################################
-# for player class
-class Player(pygame.sprite.Sprite):
-    def __init__(self):
-        super().__init__()
-        self.filename = 'Sprites/knight.png'
-        self.player_ss = SpriteSheet(self.filename)
-        self.player_image = self.player_ss.image_at(pygame.Rect(0,0,85,100))
-        self.surf = pygame.Surface((85,100))
-        self.surf.fill((111,45,43))
-        self.rect = self.surf.get_rect()
-        self.pos = v((10,150))
-        self.vel = v((0,0))
-        self.acc = v((0,0))
-        self.jumping = False
-
-    def get_image(self):
-        return self.player_image
-
-    def move(self):
-        self.acc =v((0,0.5))
-
-        pressed_keys = pygame.key.get_pressed()
-        if pressed_keys[K_LEFT]:
-            self.acc.x = -ACC
-        if pressed_keys[K_RIGHT]:
-            self.acc.x = ACC
-
-        self.acc.x += self.vel.x * FRIC
-        self.vel += self.acc
-        self.pos += self.vel + 0.5 * self.acc
-
-        if self.pos.x > SCREEN_WIDTH:
-            self.pos.x = 0
-        if self.pos.x < 0:
-            self.pos.x = SCREEN_WIDTH
-
-        self.rect.midbottom = self.pos
-
-    def update(self):
-        hits = pygame.sprite.spritecollide(self, platforms, False)
-        if self.vel.y > 0:
-            if hits:
-                #if self.pos.y < hits[0].rect.bottom:
-                   # self.pos.y = hits[0].rect.top + 1
-                self.vel.y = 0
-
-                self.jumping = False
-
-    def jump(self):
-        hits = pygame.sprite.spritecollide(self, platforms, False)
-        if hits and not self.jumping:
-            self.jumping = True
-            self.vel.y = -15
-
-    def cancel_jump(self):
-        if self.jumping:
-            if self.vel.y < -3:
-                self.vel.y = -3
-###############################Player Class END##########################################
-
-###############################Platform Class Begin######################################
-class Platform(pygame.sprite.Sprite):
-    def __init__(self):
-        super().__init__()
-        self.surf = pygame.Surface((SCREEN_WIDTH, 20))
-        self.surf.fill((255,0,0))
-        self.rect = self.surf.get_rect(center = (SCREEN_WIDTH/2, SCREEN_HEIGHT - 10))
-
-    def move(self):
-        pass
-
-###############################Platform Class End########################################
-
-
 ###############################Instantiate Objects BEGIN#################################
 player = Player()
 platform = Platform()
 ################################Instantiate Objects END####################################
 ################################Sprite Groups Begin########################################
 sprites = pygame.sprite.Group()
-
 sprites.add(player)
 sprites.add(platform)
 
 platforms = pygame.sprite.Group()
-
 platforms.add(platform)
 ################################Sprite Groups END##########################################
-
-################################Main Loop BEGIN############################################
+################################Main BEGIN#################################################
 def main():
     # inititialize pygame
     pygame.init()
@@ -344,8 +189,8 @@ def main():
                     if event.key == pygame.K_ESCAPE:
                         running = False
         ###############################Game Over Screen END######################################
-###############################Main Loop END#############################################
-
+    ###############################Main Loop END#############################################
+################################Main END#################################################
 # quit
 pygame.quit()
 
