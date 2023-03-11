@@ -5,6 +5,9 @@ from pygame.sprite import Sprite
 from pygame.rect import Rect
 import pygame.freetype  # for UI Sprites
 
+from pytmx.util_pygame import load_pygame
+
+
 from pygame.locals import (
     K_w,
     K_UP,
@@ -49,8 +52,20 @@ FRIC = -0.12
 #Vector Shortcut
 v = pygame.math.Vector2
 
-#bullet tracking
-bullets = []
+
+
+#TILED FUNCTIONS#########################################################################
+def blit_all_tiles(screen, tmxdata, world_offset):
+    for layer in tmxdata:
+        for tile in layer.tiles():
+            #tile[0] -> x grid location
+            #tile[1] -> y grid location
+            #tile[2] -> image data for blitting
+            img = pygame.transform.scale(tile[2], (40,40))
+            x_pixel = tile[0] * 40 + world_offset[0]
+            y_pixel = tile[1] * 40 + world_offset[1]
+            screen.blit(img,(x_pixel, y_pixel))
+#########################################################################################
 
 #Texture Loading#
 #playerTexture = pygame.image.load("Sprites\knight.png")
@@ -112,6 +127,13 @@ class Player(pygame.sprite.Sprite):
             self.frame = 0
 
         self.counter += 1
+
+        if not self.jumping and not self.shooting:
+            if self.direction == 'left':
+                self.surf = pygame.transform.flip(self.player_run_images[3], True, False)
+            else:
+                self.surf = self.player_run_images[3]
+
 
         pressed_keys = pygame.key.get_pressed()
         if pressed_keys[K_LEFT]:
@@ -191,11 +213,11 @@ class Bullet(pygame.sprite.Sprite):
     def __init__(self):
         self.filename = 'Sprites/knight.png'
         self.ss = SpriteSheet(self.filename)
-        self.image = self.ss.image_at((520, 365, 40, 40),0)
+        self.image = self.ss.image_at((541, 374, 11, 11),0)
         self.surf = pygame.Surface((40,40))
         self.surf = self.image
         self.rect = self.surf.get_rect()
-        self.pos = (player.pos[0] - 20, player.pos[1])
+        self.pos = (player.pos[0], player.pos[1]-50)
         if player.direction == 'left':
             self.vel = v((-10, 0))
         else:
@@ -321,6 +343,12 @@ def main():
     # Run until user quits
     running = True
 
+    # bullet tracking
+    bullets = []
+
+    world_built = False
+    world_offset = [0, 0]
+
     ################################Main Loop BEGIN##########################################
     while running == True:
         ###############################TitleScreen BEGIN#########################################
@@ -368,6 +396,10 @@ def main():
         ##############################Main Screen BEGIN##########################################
         if GAMESTATE == MAIN_SCREEN:
 
+            if world_built == False:
+                tmxdata = load_pygame("Maps/test.tmx")
+                world_built = True
+
             # update------------------->
 
             for event in pygame.event.get():
@@ -394,20 +426,18 @@ def main():
 
             # clear screen
             screen.fill((0, 0, 0))
-
+            blit_all_tiles(screen, tmxdata, world_offset)
             # draw all sprites
             #for entity in unit_sprites:
                 #screen.blit(entity.surf, entity.rect)
             #collision
 
             player.update()
-            print(player.pos)
             for entity in sprites:
                 screen.blit(entity.surf, entity.rect)
                 entity.move()
 
             for b in bullets:
-                print(b.pos)
                 if b.pos[0] > 600:
                     bullets.remove(b)
                 b.fire()
