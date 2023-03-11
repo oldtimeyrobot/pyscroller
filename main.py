@@ -49,6 +49,9 @@ FRIC = -0.12
 #Vector Shortcut
 v = pygame.math.Vector2
 
+#bullet tracking
+bullets = []
+
 #Texture Loading#
 #playerTexture = pygame.image.load("Sprites\knight.png")
 #End Texture Loading#
@@ -85,9 +88,9 @@ class Player(pygame.sprite.Sprite):
         super().__init__()
         self.filename = 'Sprites/knight.png'
         self.player_ss = SpriteSheet(self.filename)
-        self.player_run_images = self.player_ss.load_strip((0,0,85,100),6)
-        self.player_jump_images = self.player_ss.load_strip((0,160,85,100),2)
-        self.player_shoot_images = self.player_ss.load_strip((-8, 327, 85, 100), 6)
+        self.player_run_images = self.player_ss.load_strip((0,0,85,100),6,0)
+        self.player_jump_images = self.player_ss.load_strip((0,160,85,100),2,0)
+        self.player_shoot_images = self.player_ss.load_strip((-8, 327, 85, 100), 6,0)
         self.surf = pygame.Surface((85,100))
         self.surf = self.player_run_images[0]
         self.rect = self.surf.get_rect()
@@ -184,14 +187,28 @@ class Player(pygame.sprite.Sprite):
         self.shooting = False
 ###############################Player Class END##########################################
 ###############################BULLET CLASS BEGIN########################################
+class Bullet(pygame.sprite.Sprite):
+    def __init__(self):
+        self.filename = 'Sprites/knight.png'
+        self.ss = SpriteSheet(self.filename)
+        self.image = self.ss.image_at((520, 365, 40, 40),0)
+        self.surf = pygame.Surface((40,40))
+        self.surf = self.image
+        self.rect = self.surf.get_rect()
+        self.pos = (player.pos[0] - 20, player.pos[1])
+        if player.direction == 'left':
+            self.vel = v((-10, 0))
+        else:
+            self.vel = v((10, 0))
 
-
+    def fire(self):
+        self.pos += self.vel
 ###############################BULLET CLASS END##########################################
 ###############################SpriteSheet Class Begin###################################
 class SpriteSheet:
     def __init__(self, filename):
         try:
-            self.sheet = pygame.image.load(filename).convert_alpha()
+            self.sheet = pygame.image.load(filename)
         except pygame.error as e:
             print(f"Unable to load spritesheet image: {filename}")
 
@@ -280,13 +297,12 @@ platform = Platform()
 #platform2 = Platform2()
 ################################Instantiate Objects END####################################
 ################################Sprite Groups Begin########################################
-sprites = pygame.sprite.Group()
-sprites.add(player)
-sprites.add(platform)
-
 platforms = pygame.sprite.Group()
 platforms.add(platform)
 #platforms.add(platform2)
+sprites = pygame.sprite.Group()
+sprites.add(player)
+sprites.add(platform)
 ################################Sprite Groups END##########################################
 ################################Main BEGIN#################################################
 def main():
@@ -368,12 +384,13 @@ def main():
                 if event.type == pygame.KEYDOWN:
                      if event.key == pygame.K_w:
                         player.shoot()
+                        bullets.append(Bullet())
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_w:
                         player.cancel_shooting()
 
 
-                        # draw------------------->
+            # draw------------------->
 
             # clear screen
             screen.fill((0, 0, 0))
@@ -384,10 +401,17 @@ def main():
             #collision
 
             player.update()
-
+            print(player.pos)
             for entity in sprites:
                 screen.blit(entity.surf, entity.rect)
                 entity.move()
+
+            for b in bullets:
+                print(b.pos)
+                if b.pos[0] > 600:
+                    bullets.remove(b)
+                b.fire()
+                screen.blit(b.surf, b.pos)
 
             # flip the display
             pygame.display.flip()
