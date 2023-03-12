@@ -74,8 +74,8 @@ def blit_all_tiles(screen, tmxdata, world_offset):
             screen.blit(tile[2],(x_pixel, y_pixel))
 def get_tile_properties(tmxdata, x, y, world_offset):
     #print("XX::: " + str(x))
-    world_x = x
-    world_y = y
+    world_x = x - world_offset[0]
+    world_y = y - world_offset[1]
     tile_x = world_x // 32
     tile_y = world_y // 32
     try:
@@ -102,7 +102,7 @@ class Player(pygame.sprite.Sprite):
         self.surf = pygame.Surface((85,100))
         self.surf = self.player_run_images[0]
         self.rect = self.surf.get_rect()
-        self.pos = v((480, 448))
+        self.pos = v((0,0))
         self.vel = v((0,0))
         self.acc = v((0,0))
         self.jumping = False
@@ -110,10 +110,13 @@ class Player(pygame.sprite.Sprite):
         self.counter = 0
         self.direction = 'right'
         self.shooting = False
+        self.player_old_y = 448
+        self.shift = 0
+        self.falling = False
 
     def move(self, tmxdata, world_offset):
         #get properties of tile we are standing on
-        standing_on = get_tile_properties(tmxdata, -world_offset[0]+self.pos[0], self.pos[1], world_offset)
+        standing_on = get_tile_properties(tmxdata, self.pos[0], self.pos[1], world_offset)
 
         if self.vel == v((0,0)): #if we're still reset to standing frame
             self.frame = 0
@@ -148,14 +151,12 @@ class Player(pygame.sprite.Sprite):
                 self.surf = pygame.transform.flip(self.player_run_images[3], True, False)
             else:
                 self.surf = self.player_run_images[3]
-
         # flip image if we go left, since the ss is right facing
         if pressed_keys[K_LEFT]:
             self.surf = pygame.transform.flip(self.player_run_images[self.frame], True, False)
             # draw normail image since ss is right facing
         if pressed_keys[K_RIGHT]:
             self.surf = self.player_run_images[self.frame]
-
         #animation for jumping
         if self.jumping:
             if self.direction == 'right':
@@ -172,38 +173,33 @@ class Player(pygame.sprite.Sprite):
         #move the player
         self.acc.x += self.vel.x * FRIC #Friction
         self.vel += self.acc #increase velocity by acceleration value
+
+        if self.vel.y == 0:
+            self.jumping = False
+            if self.falling == False:
+                self.falling = True
         self.pos += self.vel + 0.5 * self.acc #adjust position
 
         self.rect.midbottom = self.pos #adjust rect? for what
 
     def update(self, tmxdata, world_offset):
-        standing_on = get_tile_properties(tmxdata, -world_offset[0]+self.pos[0], self.pos[1], world_offset)
-        #print(standing_on)
-        #print("Standing On::" + str(standing_on))
-        #print("Player Pos::" + str(player.pos))
-        #print("WOFF::" + str(world_offset))
-        #hits = pygame.sprite.spritecollide(self, , False)
-        if standing_on['ground'] == 1:
+        standing_on = get_tile_properties(tmxdata, self.pos[0], self.pos[1], world_offset)
+        if standing_on['ground'] == 1 and not self.jumping:
             self.acc = v((0, 0))  # if we're on the ground no acceleration downward
-        else:
-            self.acc = v((0, 0.5))  # if we're not on the ground we're falling
-            self.jumping = True
+            self.vel[1] = 0
+            self.falling = False
 
-        if self.vel.y > 0: #if we are falling
-            #if we hit the ground
-            if standing_on['ground'] == 1 and self.jumping == True:
-                self.vel.y = 0
-                self.acc.y = 0
-                #self.pos.y = self.pos.y+1   #hits[0].rect.top + 1
-                self.jumping = False
+        if standing_on['ground'] == 0 and not self.jumping and not self.falling:
+            self.acc = v((0, 0.5))  # if we're not on the ground we're falling
+            self.falling = True
+
+        if standing_on['ground'] == 0 and self.falling:
+            self.acc = v((0, 0.5))
 
     def jump(self, tmxdata, world_offset):
-        standing_on = get_tile_properties(tmxdata, -world_offset[0]+self.pos[0], self.pos[1], world_offset)
-        #hits = pygame.sprite.spritecollide(self, platforms, False)
-        #print(standing_on)
+        standing_on = get_tile_properties(tmxdata, self.pos[0], self.pos[1], world_offset)
         if standing_on['ground'] == 1 and not self.jumping:
             self.jumping = True
-            #print(self.jumping)
             self.vel.y = -15
 
     def cancel_jump(self):
@@ -343,6 +339,7 @@ def main():
     #world vars
     world_built = False
     world_offset = [0, 0]
+    y_ground = screen.get_height()-170
 
     ################################Main Loop BEGIN##########################################
     while running == True:
@@ -412,13 +409,27 @@ def main():
                 text=str(world_offset),
             )
 
-            standing_on = get_tile_properties(tmxdata, -world_offset[0] + player.pos[0], player.pos[1], world_offset)
+            standing_on = get_tile_properties(tmxdata, player.pos[0], player.pos[1], world_offset)
             standingon = UIElement(
                 center_position=(400, 70),
                 font_size=25,
                 bg_rgb=BLUE,
                 text_rgb=WHITE,
                 text=str(standing_on),
+            )
+            fallingtxt = UIElement(
+                center_position=(400, 90),
+                font_size=25,
+                bg_rgb=BLUE,
+                text_rgb=WHITE,
+                text=str(player.falling),
+            )
+            jumpingtxt = UIElement(
+                center_position=(400, 110),
+                font_size=25,
+                bg_rgb=BLUE,
+                text_rgb=WHITE,
+                text=str(player.jumping),
             )
 
             # DEBUG
@@ -449,6 +460,8 @@ def main():
             playerpos.draw(screen)
             worldoffset.draw(screen)
             standingon.draw(screen)
+            fallingtxt.draw(screen)
+            jumpingtxt.draw(screen)
             #draw map from tiled
             blit_all_tiles(screen, tmxdata, world_offset)
 
@@ -462,11 +475,12 @@ def main():
             if player.pos[0] > SCREEN_WIDTH / 2:
                 player.pos[0] = SCREEN_WIDTH / 2
                 world_offset[0] -= 10
-
-
-
-            #print(player.pos)
-            #print(world_offset)
+            if player.pos[1] < 200:
+                player.pos[1] = 200
+                world_offset[1] += 10
+            if player.pos[1] > y_ground:
+                player.pos[1] = y_ground
+                world_offset[1] -= 10
 
             for entity in sprites:
                 screen.blit(entity.surf, entity.rect)
