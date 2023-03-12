@@ -54,6 +54,11 @@ v = pygame.math.Vector2
 # UI
 BLUE = (106, 159, 181)
 WHITE = (255, 255, 255)
+
+#Background
+bg_texture = pygame.image.load('Sprites/oak_woods_v1.0/oak_woods_v1.0/background/background_layer_2.png')
+bg_texture = pygame.transform.scale(bg_texture, (960,640))
+
 def create_surface_with_text(text, font_size, text_rgb, bg_rgb):
     """ Returns surface with text written on """
     font = pygame.freetype.SysFont("Courier", font_size, bold=True)
@@ -163,6 +168,12 @@ class Player(pygame.sprite.Sprite):
                 self.surf = self.player_jump_images[0]
             if self.direction == 'left':
                 self.surf = pygame.transform.flip(self.player_jump_images[0], True, False)
+        # animation for falling
+            if self.falling:
+                if self.direction == 'right':
+                    self.surf = self.player_jump_images[0]
+                if self.direction == 'left':
+                    self.surf = pygame.transform.flip(self.player_jump_images[0], True, False)
         #animation for shooting
         if self.shooting:
             if self.direction == 'right':
@@ -457,6 +468,7 @@ def main():
             # draw------------------->
             # clear screen
             screen.fill((0, 0, 0))
+            screen.blit(bg_texture, (0,0))
             playerpos.draw(screen)
             worldoffset.draw(screen)
             standingon.draw(screen)
