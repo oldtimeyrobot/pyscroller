@@ -7,7 +7,6 @@ import pygame.freetype  # for UI Sprites
 
 from pytmx.util_pygame import load_pygame
 
-
 from pygame.locals import (
     K_w,
     K_UP,
@@ -29,8 +28,8 @@ pygame.init()
 v = pygame.math.Vector2
 
 # Define constants for pygame window
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 632
+SCREEN_WIDTH = 960
+SCREEN_HEIGHT = 640
 
 # create screen object # set up window
 screen = pygame.display.set_mode([SCREEN_WIDTH, SCREEN_HEIGHT])
@@ -52,8 +51,16 @@ FRIC = -0.12
 #Vector Shortcut
 v = pygame.math.Vector2
 
-
-
+# UI
+BLUE = (106, 159, 181)
+WHITE = (255, 255, 255)
+def create_surface_with_text(text, font_size, text_rgb, bg_rgb):
+    """ Returns surface with text written on """
+    font = pygame.freetype.SysFont("Courier", font_size, bold=True)
+    surface, _ = font.render(text=text, fgcolor=text_rgb, bgcolor=bg_rgb)
+    return surface.convert_alpha()
+# END UI
+###############################Init and Setup END########################################
 #TILED FUNCTIONS#########################################################################
 def blit_all_tiles(screen, tmxdata, world_offset):
     for layer in tmxdata:
@@ -61,43 +68,29 @@ def blit_all_tiles(screen, tmxdata, world_offset):
             #tile[0] -> x grid location
             #tile[1] -> y grid location
             #tile[2] -> image data for blitting
-            img = pygame.transform.scale(tile[2], (40,40))
-            x_pixel = tile[0] * 40 + world_offset[0]
-            y_pixel = tile[1] * 40 + world_offset[1]
-            screen.blit(img,(x_pixel, y_pixel))
-#########################################################################################
-
-#Texture Loading#
-#playerTexture = pygame.image.load("Sprites\knight.png")
-#End Texture Loading#
-###############################Init and Setup END########################################
+            #img = pygame.transform.scale(tile[2], (40,40))
+            x_pixel = tile[0] * 32 + world_offset[0]
+            y_pixel = tile[1] * 32 + world_offset[1]
+            screen.blit(tile[2],(x_pixel, y_pixel))
+def get_tile_properties(tmxdata, x, y, world_offset):
+    #print("XX::: " + str(x))
+    world_x = x
+    world_y = y
+    tile_x = world_x // 32
+    tile_y = world_y // 32
+    try:
+        properties = tmxdata.get_tile_properties(tile_x,tile_y,0)
+        #print("X:: " + str(tile_x) + " Y:: " + str(tile_y))
+        #print("WX:: " + str(world_x) + " WY:: " + str(world_y))
+        #print(properties)
+    except ValueError:
+        properties = {"ground": 0, "solid": 0}
+    if properties is None:
+        properties = {"ground": 0, "solid": 0}
+    return properties
+###############################Tiled Functions End#######################################
 ###############################CLASS DEFS BEGIN##########################################
-###############################Platform Class Begin######################################
-class Platform(pygame.sprite.Sprite):
-    def __init__(self):
-        super().__init__()
-        self.surf = pygame.Surface((SCREEN_WIDTH, 20))
-        self.surf.fill((255,0,0))
-        self.rect = self.surf.get_rect(center = (SCREEN_WIDTH/2, SCREEN_HEIGHT - 10))
-
-    def move(self):
-        pass
-###############################Platform Class End########################################
-
-###############################Platform Class Begin######################################
-class Platform2(pygame.sprite.Sprite):
-    def __init__(self):
-        super().__init__()
-        self.surf = pygame.Surface((500, 600))
-        self.surf.fill((255,0,0))
-        self.rect = self.surf.get_rect(center = (250, 300))
-
-    def move(self):
-        pass
-###############################Platform Class End########################################
-
 ###############################Player Class BEGIN########################################
-# for player class
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
@@ -109,7 +102,7 @@ class Player(pygame.sprite.Sprite):
         self.surf = pygame.Surface((85,100))
         self.surf = self.player_run_images[0]
         self.rect = self.surf.get_rect()
-        self.pos = v((10,150))
+        self.pos = v((480, 448))
         self.vel = v((0,0))
         self.acc = v((0,0))
         self.jumping = False
@@ -118,82 +111,99 @@ class Player(pygame.sprite.Sprite):
         self.direction = 'right'
         self.shooting = False
 
-    def get_image(self):
-        return self.player_image
+    def move(self, tmxdata, world_offset):
+        #get properties of tile we are standing on
+        standing_on = get_tile_properties(tmxdata, -world_offset[0]+self.pos[0], self.pos[1], world_offset)
 
-    def move(self):
-        self.acc = v((0,0.5))
-        if self.vel == v((0,0)):
+        if self.vel == v((0,0)): #if we're still reset to standing frame
             self.frame = 0
 
-        self.counter += 1
+        self.counter += 1 #move the frame counter for controlling animation of sprites
 
+        #reset speed to zero so we can assess current inputs
+        self.acc.x = 0
+        self.vel.x = 0
+
+        pressed_keys = pygame.key.get_pressed()
+
+        if pressed_keys[K_LEFT]:
+            self.direction = 'left'
+            self.acc.x = -ACC #move to the left
+            if self.counter > 7: #framerate control for animation
+                self.frame += 1 #loop through animation frames on spritesheet
+                self.counter = 0 #start counter over, each time it reaches 7 7/60th we loop to next frame
+        if pressed_keys[K_RIGHT]:
+            self.direction = 'right'
+            self.acc.x = ACC #move to the right
+            if self.counter > 7: #framerate control for animation
+                self.frame += 1 #loop through animation frames on spritesheet
+                self.counter = 0 #start counter over, each time it reaches 7 7/60th we loop to next frame
+
+        if self.frame > 5: #when we reach the last fram ss[5] reset to ss[0]
+            self.frame = 0
+
+        # Animation for running only
         if not self.jumping and not self.shooting:
             if self.direction == 'left':
                 self.surf = pygame.transform.flip(self.player_run_images[3], True, False)
             else:
                 self.surf = self.player_run_images[3]
 
-
-        pressed_keys = pygame.key.get_pressed()
+        # flip image if we go left, since the ss is right facing
         if pressed_keys[K_LEFT]:
-            self.direction = 'left'
-            self.acc.x = -ACC
-            if self.counter > 7:
-                self.frame += 1
-                self.counter = 0
-        if pressed_keys[K_RIGHT]:
-            self.direction = 'right'
-            self.acc.x = ACC
-            if self.counter > 7:
-                self.frame += 1
-                self.counter = 0
-
-        if self.frame > 5:
-            self.frame = 0
-
-        if pressed_keys[K_LEFT]:
-            self.surf = pygame.transform.flip(self.player_run_images[self.frame],True, False)
-
+            self.surf = pygame.transform.flip(self.player_run_images[self.frame], True, False)
+            # draw normail image since ss is right facing
         if pressed_keys[K_RIGHT]:
             self.surf = self.player_run_images[self.frame]
 
-        if self.jumping == True:
+        #animation for jumping
+        if self.jumping:
             if self.direction == 'right':
                 self.surf = self.player_jump_images[0]
             if self.direction == 'left':
                 self.surf = pygame.transform.flip(self.player_jump_images[0], True, False)
-
-        if self.shooting == True:
+        #animation for shooting
+        if self.shooting:
             if self.direction == 'right':
                 self.surf = self.player_shoot_images[self.frame]
             if self.direction == 'left':
                 self.surf = pygame.transform.flip(self.player_shoot_images[self.frame], True, False)
 
+        #move the player
+        self.acc.x += self.vel.x * FRIC #Friction
+        self.vel += self.acc #increase velocity by acceleration value
+        self.pos += self.vel + 0.5 * self.acc #adjust position
 
-        self.acc.x += self.vel.x * FRIC
-        self.vel += self.acc
-        self.pos += self.vel + 0.5 * self.acc
+        self.rect.midbottom = self.pos #adjust rect? for what
 
-        if self.pos.x > SCREEN_WIDTH:
-            self.pos.x = 0
-        if self.pos.x < 0:
-            self.pos.x = SCREEN_WIDTH
+    def update(self, tmxdata, world_offset):
+        standing_on = get_tile_properties(tmxdata, -world_offset[0]+self.pos[0], self.pos[1], world_offset)
+        #print(standing_on)
+        #print("Standing On::" + str(standing_on))
+        #print("Player Pos::" + str(player.pos))
+        #print("WOFF::" + str(world_offset))
+        #hits = pygame.sprite.spritecollide(self, , False)
+        if standing_on['ground'] == 1:
+            self.acc = v((0, 0))  # if we're on the ground no acceleration downward
+        else:
+            self.acc = v((0, 0.5))  # if we're not on the ground we're falling
+            self.jumping = True
 
-        self.rect.midbottom = self.pos
-
-    def update(self):
-        hits = pygame.sprite.spritecollide(self, platforms, False)
-        if self.vel.y > 0:
-            if hits:
+        if self.vel.y > 0: #if we are falling
+            #if we hit the ground
+            if standing_on['ground'] == 1 and self.jumping == True:
                 self.vel.y = 0
-                self.pos.y = hits[0].rect.top + 1
+                self.acc.y = 0
+                #self.pos.y = self.pos.y+1   #hits[0].rect.top + 1
                 self.jumping = False
 
-    def jump(self):
-        hits = pygame.sprite.spritecollide(self, platforms, False)
-        if hits and not self.jumping:
+    def jump(self, tmxdata, world_offset):
+        standing_on = get_tile_properties(tmxdata, -world_offset[0]+self.pos[0], self.pos[1], world_offset)
+        #hits = pygame.sprite.spritecollide(self, platforms, False)
+        #print(standing_on)
+        if standing_on['ground'] == 1 and not self.jumping:
             self.jumping = True
+            #print(self.jumping)
             self.vel.y = -15
 
     def cancel_jump(self):
@@ -256,16 +266,6 @@ class SpriteSheet:
                 for x in range(image_count)]
         return self.images_at(tups, colorkey)
 ###############################SpriteSheet Class End#####################################
-# UI
-BLUE = (106, 159, 181)
-WHITE = (255, 255, 255)
-def create_surface_with_text(text, font_size, text_rgb, bg_rgb):
-    """ Returns surface with text written on """
-    font = pygame.freetype.SysFont("Courier", font_size, bold=True)
-    surface, _ = font.render(text=text, fgcolor=text_rgb, bgcolor=bg_rgb)
-    return surface.convert_alpha()
-# END UI
-
 ################################Class Def BEGIN##########################################
 class UIElement():
     """ An user interface element that can be added to a surface """
@@ -315,16 +315,10 @@ class UIElement():
 ###############################CLASS DEFS END############################################
 ###############################Instantiate Objects BEGIN#################################
 player = Player()
-platform = Platform()
-#platform2 = Platform2()
 ################################Instantiate Objects END####################################
 ################################Sprite Groups Begin########################################
-platforms = pygame.sprite.Group()
-platforms.add(platform)
-#platforms.add(platform2)
 sprites = pygame.sprite.Group()
 sprites.add(player)
-sprites.add(platform)
 ################################Sprite Groups END##########################################
 ################################Main BEGIN#################################################
 def main():
@@ -346,6 +340,7 @@ def main():
     # bullet tracking
     bullets = []
 
+    #world vars
     world_built = False
     world_offset = [0, 0]
 
@@ -396,49 +391,89 @@ def main():
         ##############################Main Screen BEGIN##########################################
         if GAMESTATE == MAIN_SCREEN:
 
+            #build map, check if it's built, if not then we load the map
             if world_built == False:
                 tmxdata = load_pygame("Maps/test.tmx")
                 world_built = True
 
-            # update------------------->
+            # DEBUG
+            playerpos = UIElement(
+                center_position=(400, 10),
+                font_size=30,
+                bg_rgb=BLUE,
+                text_rgb=WHITE,
+                text=str(player.pos),
+            )
+            worldoffset = UIElement(
+                center_position=(400, 40),
+                font_size=30,
+                bg_rgb=BLUE,
+                text_rgb=WHITE,
+                text=str(world_offset),
+            )
+
+            standing_on = get_tile_properties(tmxdata, -world_offset[0] + player.pos[0], player.pos[1], world_offset)
+            standingon = UIElement(
+                center_position=(400, 70),
+                font_size=25,
+                bg_rgb=BLUE,
+                text_rgb=WHITE,
+                text=str(standing_on),
+            )
+
+            # DEBUG
 
             for event in pygame.event.get():
                 # escape key to exit
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
+                    if event.key == pygame.K_ESCAPE: #quit
                         running = False
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
-                        player.jump()
+                    if event.key == pygame.K_SPACE: #jump
+                        player.jump(tmxdata, world_offset)
                 if event.type == pygame.KEYUP:
-                    if event.key == pygame.K_SPACE:
+                    if event.key == pygame.K_SPACE: #cancel jump
                         player.cancel_jump()
                 if event.type == pygame.KEYDOWN:
-                     if event.key == pygame.K_w:
+                     if event.key == pygame.K_w:    #shoot
                         player.shoot()
                         bullets.append(Bullet())
                 if event.type == pygame.KEYUP:
-                    if event.key == pygame.K_w:
+                    if event.key == pygame.K_w: #cancel shoot
                         player.cancel_shooting()
 
 
             # draw------------------->
-
             # clear screen
             screen.fill((0, 0, 0))
+            playerpos.draw(screen)
+            worldoffset.draw(screen)
+            standingon.draw(screen)
+            #draw map from tiled
             blit_all_tiles(screen, tmxdata, world_offset)
-            # draw all sprites
-            #for entity in unit_sprites:
-                #screen.blit(entity.surf, entity.rect)
-            #collision
 
-            player.update()
+            #update and draw
+            player.update(tmxdata, world_offset)
+
+            # bounding space for screen scrolling
+            if player.pos[0] < SCREEN_WIDTH / 2:
+                player.pos[0] = SCREEN_WIDTH / 2
+                world_offset[0] += 10
+            if player.pos[0] > SCREEN_WIDTH / 2:
+                player.pos[0] = SCREEN_WIDTH / 2
+                world_offset[0] -= 10
+
+
+
+            #print(player.pos)
+            #print(world_offset)
+
             for entity in sprites:
                 screen.blit(entity.surf, entity.rect)
-                entity.move()
+                entity.move(tmxdata, world_offset)
 
             for b in bullets:
-                if b.pos[0] > 600:
+                if b.pos[0] > SCREEN_WIDTH or b.pos[0] < 0:
                     bullets.remove(b)
                 b.fire()
                 screen.blit(b.surf, b.pos)
